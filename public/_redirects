@@ -1,0 +1,4 @@
+# Netlify redirect rules in public folder
+# This is a backup in case the root _redirects isn't processed
+
+/*    /index.html   200
