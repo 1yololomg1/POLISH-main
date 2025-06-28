@@ -1,0 +1,143 @@
+// POLISH Database Schema
+// This file defines the database structure for the POLISH application
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  password  String
+  credits   Int      @default(10)
+  subscription String @default("free")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  files     File[]
+  exports   Export[]
+  payments  Payment[]
+  sessions  Session[]
+
+  @@map("users")
+}
+
+model File {
+  id              String   @id @default(cuid())
+  userId          String
+  name            String
+  size            BigInt
+  storagePath     String?
+  processed       Boolean  @default(false)
+  qualityScore    Decimal? @db.Decimal(5, 2)
+  depthRange      Decimal[] @default([])
+  originalSampling Decimal? @db.Decimal(10, 4)
+  curveCount      Int      @default(0)
+  visualizationCache Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exports         Export[]
+  processingJobs  ProcessingJob[]
+
+  @@map("files")
+}
+
+model ProcessingJob {
+  id              String   @id @default(cuid())
+  fileId          String
+  userId          String
+  status          String   @default("pending") // pending, processing, completed, failed
+  progress        Int      @default(0)
+  options         Json
+  result          Json?
+  error           String?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime @default(now())
+
+  // Relations
+  file            File     @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  @@map("processing_jobs")
+}
+
+model Export {
+  id              String   @id @default(cuid())
+  userId          String
+  fileId          String
+  format          String
+  status          String   @default("pending") // pending, processing, completed, failed
+  downloadUrl     String?
+  fileSize        BigInt?
+  processingTime  Int?
+  error           String?
+  createdAt       DateTime @default(now())
+  completedAt     DateTime?
+
+  // Relations
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  file            File     @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  @@map("exports")
+}
+
+model Payment {
+  id              String   @id @default(cuid())
+  userId          String
+  stripePaymentId String   @unique
+  amount          Int
+  currency        String   @default("usd")
+  status          String   @default("pending") // pending, succeeded, failed
+  description     String
+  metadata        Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("payments")
+}
+
+model Session {
+  id              String   @id @default(cuid())
+  userId          String
+  token           String   @unique
+  expiresAt       DateTime
+  createdAt       DateTime @default(now())
+
+  // Relations
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model SystemLog {
+  id              String   @id @default(cuid())
+  level           String   // info, warn, error
+  message         String
+  metadata        Json?
+  createdAt       DateTime @default(now())
+
+  @@map("system_logs")
+}
+
+model Configuration {
+  id              String   @id @default(cuid())
+  key             String   @unique
+  value           String
+  description     String?
+  updatedAt       DateTime @updatedAt
+
+  @@map("configurations")
+} 
