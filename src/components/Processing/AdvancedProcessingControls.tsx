@@ -186,11 +186,11 @@ export const AdvancedProcessingControls: React.FC = () => {
     for (let i = 0; i < data.length; i++) {
       const start = Math.max(0, i - halfWindow);
       const end = Math.min(data.length, i + halfWindow + 1);
-      const window = data.slice(start, end);
+      const dataWindow = data.slice(start, end);
       
-      if (window.length >= polynomialOrder + 1) {
+      if (dataWindow.length >= polynomialOrder + 1) {
         // Simple polynomial fitting (simplified version)
-        result[i] = window.reduce((sum, val) => sum + val, 0) / window.length;
+        result[i] = dataWindow.reduce((sum, val) => sum + val, 0) / dataWindow.length;
       } else {
         result[i] = data[i];
       }
@@ -208,10 +208,10 @@ export const AdvancedProcessingControls: React.FC = () => {
     for (let i = 0; i < data.length; i++) {
       const start = Math.max(0, i - halfWindow);
       const end = Math.min(data.length, i + halfWindow + 1);
-      const window = data.slice(start, end);
+      const dataWindow = data.slice(start, end);
       
-      const median = calculateMedian(window);
-      const mad = calculateMAD(window, median);
+      const median = calculateMedian(dataWindow);
+      const mad = calculateMAD(dataWindow, median);
       
       if (Math.abs(data[i] - median) > threshold * mad) {
         spikeIndices.push(i);
