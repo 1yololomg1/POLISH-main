@@ -1,21 +1,15 @@
 import * as React from 'react';
-import { useState } from 'react';
 import { X, Download, Lock, Star, FileText, CreditCard, CheckCircle, AlertCircle, Zap } from 'lucide-react';
 import { useAppStore } from '../../store';
 import { ExportOptions } from '../../types';
-import { STRIPE_PRODUCTS } from '../../stripe-config';
-import stripeService from '../../services/stripeService';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
+import PaymentModal from './PaymentModal';
 
 export const ExportModal: React.FC = () => {
-  const { showExportModal, setShowExportModal, activeFile } = useAppStore();
+  const { showExportModal, setShowExportModal, activeFile, session } = useAppStore();
   const [selectedFormat, setSelectedFormat] = React.useState<'las' | 'csv' | 'xlsx' | 'json' | 'ascii' | 'witsml' | 'segy'>('las');
   const [includeQC, setIncludeQC] = React.useState(true);
   const [includeHistory, setIncludeHistory] = React.useState(true);
-  const [isLoading, setIsLoading] = useState(false);
-  const navigate = useNavigate();
-  const { user } = useAuth();
+  const [showPaymentModal, setShowPaymentModal] = React.useState(false);
 
   if (!showExportModal || !activeFile) return null;
 
@@ -36,7 +30,7 @@ export const ExportModal: React.FC = () => {
     return 'F';
   };
 
-  const handleExport = async () => {
+  const handleExport = () => {
     // Validate file before export
     if (!activeFile || !activeFile.data || activeFile.data.length === 0) {
       alert('Export failed: No data available for export. Please ensure your file has been processed successfully.');
@@ -67,40 +61,28 @@ export const ExportModal: React.FC = () => {
       }
     }
     
-    if (!user) {
-      // Redirect to login page if not authenticated
-      navigate('/login', { state: { returnTo: '/export' } });
-      setShowExportModal(false);
-      return;
-    }
+    // Show payment modal for export
+    setShowPaymentModal(true);
+  };
 
-    try {
-      setIsLoading(true);
-      
-      // Determine which product to purchase based on format
-      const productKey = selectedFormat === 'las' ? 'LAS_WITH_REPORT' : 'REPORT_ONLY';
-      
-      // Create success and cancel URLs
-      const successUrl = `${window.location.origin}/checkout/success?session_id={CHECKOUT_SESSION_ID}`;
-      const cancelUrl = `${window.location.origin}/checkout/cancel`;
-      
-      // Create checkout session
-      const { url } = await stripeService.createCheckoutSession(
-        productKey,
-        successUrl,
-        cancelUrl
-      );
-      
-      // Redirect to Stripe Checkout
-      stripeService.redirectToCheckout(url);
-      
-    } catch (error) {
-      console.error('Error creating checkout session:', error);
-      alert('Failed to create checkout session. Please try again later.');
-    } finally {
-      setIsLoading(false);
-      setShowExportModal(false);
-    }
+  const handlePaymentSuccess = (downloadUrl: string) => {
+    // Trigger immediate download
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = `${activeFile?.name.replace('.las', '')}_processed.${selectedFormat}`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    setShowPaymentModal(false);
+    setShowExportModal(false);
+    
+    // Show success message
+    alert(`Export completed successfully!\n\nIMPORTANT: Please save your file immediately to your device. POLISH does not store your files and cannot recover them if lost.`);
+  };
+
+  const handlePaymentCancel = () => {
+    setShowPaymentModal(false);
   };
 
   const exportOptions: ExportOptions = {
@@ -110,12 +92,16 @@ export const ExportModal: React.FC = () => {
     customFormatting: {}
   };
 
-  // Get product prices from configuration
-  const reportOnlyPrice = 150; // $150 for PDF report only
-  const lasWithReportPrice = 600; // $600 for LAS file with report
+  // New pricing structure
+  const getExportPrice = () => {
+    if (selectedFormat === 'las') {
+      return 600; // $600 for LAS file with report
+    } else {
+      return 150; // $150 for PDF report only
+    }
+  };
 
-  // Determine price based on selected format
-  const exportPrice = selectedFormat === 'las' ? lasWithReportPrice : reportOnlyPrice;
+  const exportPrice = getExportPrice();
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -248,8 +234,8 @@ export const ExportModal: React.FC = () => {
                 <div className="flex items-center space-x-3">
                   <FileText className="h-5 w-5" />
                   <div className="text-left">
-                    <p className="font-medium">{STRIPE_PRODUCTS.LAS_WITH_REPORT.name}</p>
-                    <p className="text-xs text-slate-400">{STRIPE_PRODUCTS.LAS_WITH_REPORT.description}</p>
+                    <p className="font-medium">Cleaned LAS File + Report</p>
+                    <p className="text-xs text-slate-400">Industry standard format with documentation</p>
                     <p className="text-sm font-bold text-green-400 mt-1">$600</p>
                   </div>
                 </div>
@@ -266,9 +252,9 @@ export const ExportModal: React.FC = () => {
                 <div className="flex items-center space-x-3">
                   <FileText className="h-5 w-5" />
                   <div className="text-left">
-                    <p className="font-medium">{STRIPE_PRODUCTS.REPORT_ONLY.name}</p>
-                    <p className="text-xs text-slate-400">{STRIPE_PRODUCTS.REPORT_ONLY.description}</p>
-                    <p className="text-sm font-bold text-green-400 mt-1">$150</p>
+                    <p className="font-medium">CSV Export + Report</p>
+                    <p className="text-xs text-slate-400">Spreadsheet format with documentation</p>
+                    <p className="text-sm font-bold text-green-400 mt-1">$600</p>
                   </div>
                 </div>
               </button>
@@ -394,26 +380,15 @@ export const ExportModal: React.FC = () => {
               <button
                 onClick={() => setShowExportModal(false)}
                 className="px-4 py-2 text-slate-300 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
-                disabled={isLoading}
               >
                 Cancel
               </button>
               <button
                 onClick={handleExport}
-                disabled={isLoading}
-                className="flex items-center space-x-2 px-6 py-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-lg font-medium transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center space-x-2 px-6 py-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-lg font-medium transition-all duration-200 shadow-lg hover:shadow-xl"
               >
-                {isLoading ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    <span>Processing...</span>
-                  </>
-                ) : (
-                  <>
-                    <CreditCard className="h-4 w-4" />
-                    <span>Purchase Export</span>
-                  </>
-                )}
+                <CreditCard className="h-4 w-4" />
+                <span>Purchase Export</span>
               </button>
             </div>
           </div>

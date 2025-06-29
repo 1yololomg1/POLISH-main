@@ -3,20 +3,20 @@
 
 export const config = {
   // Payment System Toggle - Set to false to disable payments for testing
-  paymentSystemEnabled: import.meta.env.VITE_PAYMENT_SYSTEM_ENABLED !== 'false', // Default to true unless explicitly disabled
+  paymentSystemEnabled: true, // ← Change this to false to disable payments
   
   // Other configuration options
-  maxFileSize: parseInt(import.meta.env.VITE_MAX_FILE_SIZE || '104857600'), // 100MB
-  apiBaseUrl: import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api',
+  maxFileSize: 100 * 1024 * 1024, // 100MB
+  apiBaseUrl: 'http://localhost:3001/api', // Can be overridden by environment variable
   
   // Feature toggles
   features: {
-    export: import.meta.env.VITE_FEATURE_EXPORT !== 'false',
-    conversion: import.meta.env.VITE_FEATURE_CONVERSION !== 'false',
-    reports: import.meta.env.VITE_FEATURE_REPORTS !== 'false',
-    multiWell: import.meta.env.VITE_FEATURE_MULTI_WELL !== 'false',
-    advancedQC: import.meta.env.VITE_FEATURE_ADVANCED_QC !== 'false',
-    geologicalAnalysis: import.meta.env.VITE_FEATURE_GEOLOGICAL_ANALYSIS !== 'false'
+    export: true,
+    conversion: true,
+    reports: true,
+    multiWell: true,
+    advancedQC: true,
+    geologicalAnalysis: true
   },
   
   // Development/testing options
@@ -38,4 +38,4 @@ export const isFeatureEnabled = (feature: keyof typeof config.features) => {
 // Helper function to get configuration value
 export const getConfig = <K extends keyof typeof config>(key: K): typeof config[K] => {
   return config[key];
-};
+}; 

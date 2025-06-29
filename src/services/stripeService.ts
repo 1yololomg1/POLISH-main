@@ -1,102 +1,210 @@
-import { createClient } from '@supabase/supabase-js';
-import { STRIPE_PRODUCTS } from '../stripe-config';
+import { StripePaymentData, PaymentFormData, ExportOptions } from '../types';
+import SessionManager from '../utils/sessionManager';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
-
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+interface StripeConfig {
+  publishableKey: string;
+  apiUrl: string;
+}
 
 class StripeService {
-  /**
-   * Create a Stripe checkout session for a product
-   * @param productKey The key of the product in STRIPE_PRODUCTS
-   * @param successUrl URL to redirect to after successful payment
-   * @param cancelUrl URL to redirect to if payment is cancelled
-   */
-  async createCheckoutSession(
-    productKey: string,
-    successUrl: string,
-    cancelUrl: string
-  ): Promise<{ sessionId: string; url: string }> {
+  private config: StripeConfig;
+  private sessionManager: SessionManager;
+
+  constructor() {
+    this.config = {
+      publishableKey: import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || 'pk_test_your_key_here',
+      apiUrl: import.meta.env.VITE_API_URL || 'http://localhost:3001'
+    };
+    this.sessionManager = SessionManager.getInstance();
+  }
+
+  async createPaymentSession(
+    fileId: string, 
+    exportOptions: ExportOptions,
+    customerData: PaymentFormData
+  ): Promise<string> {
+    const sessionId = this.sessionManager.getSessionId();
+    if (!sessionId) {
+      throw new Error('No active session found');
+    }
+
+    const paymentData: StripePaymentData = {
+      sessionId,
+      amount: 60000, // $600 in cents
+      currency: 'usd',
+      description: `LAS File Export - ${exportOptions.format.toUpperCase()}`,
+      successUrl: `${window.location.origin}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancelUrl: `${window.location.origin}/payment/cancel`,
+      metadata: {
+        fileId,
+        format: exportOptions.format,
+        includeQC: exportOptions.includeQC,
+        includeProcessingHistory: exportOptions.includeProcessingHistory
+      }
+    };
+
     try {
-      const product = STRIPE_PRODUCTS[productKey];
-      
-      if (!product) {
-        throw new Error(`Product ${productKey} not found`);
+      const response = await fetch(`${this.config.apiUrl}/api/payment/create-session`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...paymentData,
+          customerInfo: customerData
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create payment session');
       }
 
-      const { data, error } = await supabase.functions.invoke('stripe-checkout', {
-        body: {
-          price_id: product.priceId,
-          success_url: successUrl,
-          cancel_url: cancelUrl,
-          mode: product.mode
-        }
+      const result = await response.json();
+      
+      // Store Stripe session ID
+      this.sessionManager.setStripeSessionId(result.sessionId);
+      
+      return result.sessionId;
+    } catch (error) {
+      console.error('Error creating payment session:', error);
+      throw error;
+    }
+  }
+
+  async redirectToCheckout(sessionId: string): Promise<void> {
+    try {
+      // Load Stripe.js
+      const stripe = await this.loadStripe();
+      
+      // Redirect to Stripe Checkout
+      const { error } = await stripe.redirectToCheckout({
+        sessionId
       });
 
       if (error) {
-        throw new Error(`Error creating checkout session: ${error.message}`);
+        throw error;
+      }
+    } catch (error) {
+      console.error('Error redirecting to checkout:', error);
+      throw error;
+    }
+  }
+
+  async handlePaymentSuccess(sessionId: string): Promise<{ fileId: string; downloadUrl: string }> {
+    try {
+      const response = await fetch(`${this.config.apiUrl}/api/payment/verify-session`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ sessionId })
+      });
+
+      if (!response.ok) {
+        throw new Error('Payment verification failed');
       }
 
+      const result = await response.json();
+      
+      // Update session payment status
+      this.sessionManager.setPaymentStatus('completed');
+      
       return {
-        sessionId: data.sessionId,
-        url: data.url
+        fileId: result.fileId,
+        downloadUrl: result.downloadUrl
       };
     } catch (error) {
-      console.error('Error creating checkout session:', error);
+      console.error('Error handling payment success:', error);
+      this.sessionManager.setPaymentStatus('failed');
       throw error;
     }
   }
 
-  /**
-   * Redirect to Stripe Checkout
-   * @param url The checkout URL from createCheckoutSession
-   */
-  redirectToCheckout(url: string): void {
-    window.location.href = url;
-  }
-
-  /**
-   * Get the current user's subscription status
-   */
-  async getUserSubscription() {
+  async processImmediateDownload(
+    fileId: string, 
+    exportOptions: ExportOptions,
+    paymentData: PaymentFormData
+  ): Promise<string> {
     try {
-      const { data: subscription, error } = await supabase
-        .from('stripe_user_subscriptions')
-        .select('*')
-        .maybeSingle();
-
-      if (error) {
-        throw error;
-      }
-
-      return subscription;
+      // Create payment session
+      const sessionId = await this.createPaymentSession(fileId, exportOptions, paymentData);
+      
+      // Redirect to Stripe Checkout
+      await this.redirectToCheckout(sessionId);
+      
+      return sessionId;
     } catch (error) {
-      console.error('Error fetching user subscription:', error);
+      console.error('Error processing immediate download:', error);
       throw error;
     }
   }
 
-  /**
-   * Get the current user's order history
-   */
-  async getUserOrders() {
+  private async loadStripe(): Promise<any> {
+    // Check if Stripe is already loaded
+    if (window.Stripe) {
+      return window.Stripe(this.config.publishableKey);
+    }
+
+    // Load Stripe.js dynamically
+    return new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = 'https://js.stripe.com/v3/';
+      script.onload = () => {
+        if (window.Stripe) {
+          resolve(window.Stripe(this.config.publishableKey));
+        } else {
+          reject(new Error('Stripe failed to load'));
+        }
+      };
+      script.onerror = () => reject(new Error('Failed to load Stripe'));
+      document.head.appendChild(script);
+    });
+  }
+
+  // Alternative method for direct payment processing (if not using Checkout)
+  async processDirectPayment(
+    fileId: string,
+    exportOptions: ExportOptions,
+    paymentData: PaymentFormData,
+    paymentMethodId: string
+  ): Promise<{ success: boolean; downloadUrl?: string; error?: string }> {
     try {
-      const { data: orders, error } = await supabase
-        .from('stripe_user_orders')
-        .select('*')
-        .order('order_date', { ascending: false });
+      const response = await fetch(`${this.config.apiUrl}/api/payment/process`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          sessionId: this.sessionManager.getSessionId(),
+          fileId,
+          exportOptions,
+          paymentData,
+          paymentMethodId
+        })
+      });
 
-      if (error) {
-        throw error;
+      const result = await response.json();
+
+      if (result.success) {
+        this.sessionManager.setPaymentStatus('completed');
+        return { success: true, downloadUrl: result.downloadUrl };
+      } else {
+        this.sessionManager.setPaymentStatus('failed');
+        return { success: false, error: result.error };
       }
-
-      return orders;
     } catch (error) {
-      console.error('Error fetching user orders:', error);
-      throw error;
+      console.error('Error processing direct payment:', error);
+      this.sessionManager.setPaymentStatus('failed');
+      return { success: false, error: 'Payment processing failed' };
     }
   }
 }
 
-export default new StripeService();
+// Add Stripe to window object for TypeScript
+declare global {
+  interface Window {
+    Stripe?: any;
+  }
+}
+
+export default StripeService; 
