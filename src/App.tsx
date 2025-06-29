@@ -8,7 +8,7 @@ import { MultiTrackVisualization } from './components/Dashboard/MultiTrackVisual
 import { AdvancedProcessingControls } from './components/Processing/AdvancedProcessingControls';
 import { ComprehensiveQCDashboard } from './components/QC/ComprehensiveQCDashboard';
 import { ExportModal } from './components/Export/ExportModal';
-import PaymentModal from './components/Export/PaymentModal';i
+import PaymentModal from './components/Export/PaymentModal';
 import { HelpModal } from './components/Help/HelpModal';
 import { ALVARODashboard } from './components/Dashboard/ALVARODashboard';
 import { QCDashboard } from './components/QC/QCDashboard';
