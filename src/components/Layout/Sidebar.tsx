@@ -63,15 +63,31 @@ export const Sidebar: React.FC = () => {
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1 min-w-0">
                     <h3 className="text-sm font-semibold text-white truncate mb-1">
-                      {file.name}
+                      {file.header?.displayName || file.name}
                     </h3>
-                    <div className="flex items-center space-x-3 text-xs text-slate-400">
+                    <div className="flex items-center space-x-3 text-xs text-slate-400 mb-1">
                       <span>{formatFileSize(file.size)}</span>
                       <span>•</span>
                       <span>{file.curves.length} curves</span>
                       <span>•</span>
                       <span>LAS {file.version}</span>
                     </div>
+                    {file.header && (
+                      <div className="text-xs text-slate-500 space-y-0.5">
+                        {file.header.operator && (
+                          <div>Operator: {file.header.operator}</div>
+                        )}
+                        {file.header.field && file.header.field !== file.header.well && (
+                          <div>Field: {file.header.field}</div>
+                        )}
+                        {file.header.location && (
+                          <div>Location: {file.header.location}</div>
+                        )}
+                        {file.header.uwi && (
+                          <div>UWI: {file.header.uwi}</div>
+                        )}
+                      </div>
+                    )}
                   </div>
                   <button
                     onClick={(e) => {
@@ -261,55 +277,136 @@ const FileUploadZone: React.FC = () => {
       uwi: '',
       serviceCompany: '',
       logDate: new Date().toISOString().split('T')[0],
-      elevation: 0
+      elevation: 0,
+      // Additional fields for business LAS files
+      operator: '',
+      rig: '',
+      wellbore: '',
+      api: '',
+      county: '',
+      state: '',
+      country: '',
+      province: '',
+      block: '',
+      lease: '',
+      section: '',
+      township: '',
+      range: '',
+      meridian: '',
+      latitude: 0,
+      longitude: 0,
+      kb: 0,
+      gl: 0,
+      td: 0,
+      md: 0,
+      tvd: 0,
+      comments: []
     };
 
     console.log('Parsing version lines:', versionLines);
     console.log('Parsing well lines:', wellLines);
 
-    // Parse version section
+    // Parse version section with more robust handling
     for (const line of versionLines) {
-      const [key, value] = line.split(':').map(s => s.trim());
+      if (!line.trim() || line.startsWith('~') || line.startsWith('#')) continue;
+      
+      const colonIndex = line.indexOf(':');
+      if (colonIndex === -1) continue;
+      
+      const key = line.substring(0, colonIndex).trim();
+      const value = line.substring(colonIndex + 1).trim();
+      
+      console.log(`Version header: ${key} = ${value}`);
+      
       if (key === 'VERS') header.version = value;
-      else if (key === 'WRAP') header.wrap = value === 'YES';
+      else if (key === 'WRAP') header.wrap = value.toUpperCase() === 'YES';
       else if (key === 'NULL') header.nullValue = parseFloat(value);
+      else if (key === 'STRT') header.startDepth = parseFloat(value);
+      else if (key === 'STOP') header.stopDepth = parseFloat(value);
+      else if (key === 'STEP') header.step = parseFloat(value);
     }
 
-    // Parse well section with more robust parsing
+    // Parse well section with comprehensive field mapping
     for (const line of wellLines) {
-      const parts = line.split(':').map(s => s.trim());
-      if (parts.length >= 2) {
-        const key = parts[0];
-        const value = parts.slice(1).join(':').trim(); // Handle values that might contain colons
-        
-        console.log(`Parsing well header: ${key} = ${value}`);
-        
-        if (key === 'COMP') header.company = value;
-        else if (key === 'WELL') header.well = value;
-        else if (key === 'FLD') header.field = value;
-        else if (key === 'LOC') header.location = value;
-        else if (key === 'DATE') header.date = value;
-        else if (key === 'UWI') header.uwi = value;
-        else if (key === 'SRVC') header.serviceCompany = value;
-        else if (key === 'API') header.uwi = value; // API is often used instead of UWI
-        else if (key === 'PROV') header.province = value;
-        else if (key === 'CNTY') header.county = value;
-        else if (key === 'STAT') header.state = value;
-        else if (key === 'CTRY') header.country = value;
-        else if (key === 'SRVC') header.serviceCompany = value;
-        else if (key === 'SLOG') header.logDate = value;
+      if (!line.trim() || line.startsWith('~') || line.startsWith('#')) continue;
+      
+      const colonIndex = line.indexOf(':');
+      if (colonIndex === -1) continue;
+      
+      const key = line.substring(0, colonIndex).trim();
+      const value = line.substring(colonIndex + 1).trim();
+      
+      console.log(`Well header: ${key} = ${value}`);
+      
+      // Standard LAS fields
+      if (key === 'COMP') header.company = value;
+      else if (key === 'WELL') header.well = value;
+      else if (key === 'FLD') header.field = value;
+      else if (key === 'LOC') header.location = value;
+      else if (key === 'DATE') header.date = value;
+      else if (key === 'UWI') header.uwi = value;
+      else if (key === 'SRVC') header.serviceCompany = value;
+      else if (key === 'SLOG') header.logDate = value;
+      
+      // Business-specific fields
+      else if (key === 'OPER') header.operator = value;
+      else if (key === 'RIG') header.rig = value;
+      else if (key === 'WELLBORE') header.wellbore = value;
+      else if (key === 'API') header.api = value;
+      else if (key === 'CNTY') header.county = value;
+      else if (key === 'STAT') header.state = value;
+      else if (key === 'CTRY') header.country = value;
+      else if (key === 'PROV') header.province = value;
+      else if (key === 'BLOCK') header.block = value;
+      else if (key === 'LEASE') header.lease = value;
+      else if (key === 'SECT') header.section = value;
+      else if (key === 'TOWN') header.township = value;
+      else if (key === 'RANG') header.range = value;
+      else if (key === 'MERI') header.meridian = value;
+      else if (key === 'LATI') header.latitude = parseFloat(value);
+      else if (key === 'LONG') header.longitude = parseFloat(value);
+      else if (key === 'KB') header.kb = parseFloat(value);
+      else if (key === 'GL') header.gl = parseFloat(value);
+      else if (key === 'TD') header.td = parseFloat(value);
+      else if (key === 'MD') header.md = parseFloat(value);
+      else if (key === 'TVD') header.tvd = parseFloat(value);
+      else if (key === 'ELEV') header.elevation = parseFloat(value);
+      
+      // Handle comments and other fields
+      else if (key === 'COMM' || key.startsWith('C')) {
+        if (value.trim()) header.comments.push(value);
+      }
+      
+      // Handle any other fields by storing them
+      else if (value.trim()) {
+        header[key.toLowerCase()] = value;
       }
     }
+
+    // Smart field mapping for common variations
+    if (!header.uwi && header.api) header.uwi = header.api;
+    if (!header.api && header.uwi) header.api = header.uwi;
+    if (!header.operator && header.company) header.operator = header.company;
+    if (!header.company && header.operator) header.company = header.operator;
 
     // Validate and provide fallbacks for critical fields
     if (!header.well) {
       console.warn('No well name found in LAS file header');
+      header.well = 'Unknown Well';
     }
-    if (!header.company) {
-      console.warn('No company name found in LAS file header');
+    if (!header.company && !header.operator) {
+      console.warn('No company/operator name found in LAS file header');
+      header.company = 'Unknown Company';
     }
-    if (!header.uwi) {
+    if (!header.uwi && !header.api) {
       console.warn('No UWI/API number found in LAS file header');
+      header.uwi = 'Unknown UWI';
+    }
+
+    // Create a display name for the well
+    header.displayName = header.well || header.uwi || 'Unknown Well';
+    if (header.field && header.field !== header.well) {
+      header.displayName += ` (${header.field})`;
     }
 
     console.log('Parsed header:', header);
