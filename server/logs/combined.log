@@ -1,0 +1,17 @@
+{"level":"info","message":"Database initialized","service":"polish-backend","timestamp":"2025-06-27T02:23:18.903Z"}
+{"level":"info","message":"Redis initialized","service":"polish-backend","timestamp":"2025-06-27T02:23:18.906Z"}
+{"level":"info","message":"Job queues initialized","service":"polish-backend","timestamp":"2025-06-27T02:23:18.907Z"}
+{"level":"info","message":"POLISH Backend Server running on port 3001","service":"polish-backend","timestamp":"2025-06-27T02:23:18.914Z"}
+{"level":"info","message":"Environment: production","service":"polish-backend","timestamp":"2025-06-27T02:23:18.915Z"}
+{"level":"info","message":"SIGTERM received, shutting down gracefully","service":"polish-backend","timestamp":"2025-06-27T02:36:59.860Z"}
+{"level":"info","message":"Database initialized","service":"polish-backend","timestamp":"2025-06-27T02:37:52.244Z"}
+{"level":"info","message":"Redis initialized","service":"polish-backend","timestamp":"2025-06-27T02:37:52.246Z"}
+{"level":"info","message":"Job queues initialized","service":"polish-backend","timestamp":"2025-06-27T02:37:52.246Z"}
+{"level":"info","message":"POLISH Backend Server running on port 3001","service":"polish-backend","timestamp":"2025-06-27T02:37:52.251Z"}
+{"level":"info","message":"Environment: production","service":"polish-backend","timestamp":"2025-06-27T02:37:52.251Z"}
+{"level":"info","message":"SIGTERM received, shutting down gracefully","service":"polish-backend","timestamp":"2025-06-27T02:39:15.402Z"}
+{"level":"info","message":"Database initialized","service":"polish-backend","timestamp":"2025-06-27T02:46:47.185Z"}
+{"level":"info","message":"Redis initialized","service":"polish-backend","timestamp":"2025-06-27T02:46:47.187Z"}
+{"level":"info","message":"Job queues initialized","service":"polish-backend","timestamp":"2025-06-27T02:46:47.188Z"}
+{"level":"info","message":"POLISH Backend Server running on port 3001","service":"polish-backend","timestamp":"2025-06-27T02:46:47.191Z"}
+{"level":"info","message":"Environment: production","service":"polish-backend","timestamp":"2025-06-27T02:46:47.191Z"}
