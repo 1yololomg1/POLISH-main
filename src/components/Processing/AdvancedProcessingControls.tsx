@@ -156,8 +156,8 @@ export const AdvancedProcessingControls: React.FC = () => {
             
             // Replace spikes with interpolated values
             if (spikeIndices.length > 0) {
-              const validIndices = curveData.map((_, i) => i).filter(i => !spikeIndices.includes(i));
-              const validValues = validIndices.map(i => curveData[i]);
+              const validIndices = curveData.map((_, idx) => idx).filter(idx => !spikeIndices.includes(idx));
+              const validValues = validIndices.map(idx => curveData[idx]);
               
               for (let i = 0; i < processedData.length; i++) {
                 if (processedData[i][curve.mnemonic] !== null) {
@@ -237,8 +237,8 @@ export const AdvancedProcessingControls: React.FC = () => {
     if (validIndices.length === 1) return validValues[0];
     
     // Find nearest valid indices
-    const leftIndex = validIndices.filter(i => i < index).pop();
-    const rightIndex = validIndices.find(i => i > index);
+    const leftIndex = validIndices.filter(idx => idx < index).pop();
+    const rightIndex = validIndices.find(idx => idx > index);
     
     if (leftIndex === undefined && rightIndex === undefined) return validValues[0];
     if (leftIndex === undefined) return validValues[validIndices.indexOf(rightIndex!)];
